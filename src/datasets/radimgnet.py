@@ -23,6 +23,7 @@ import pandas as pd
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
+import random
 
 logger = getLogger()
 
@@ -36,6 +37,81 @@ PATH_COLUMN_CANDIDATES = (
 
 LABEL_COLUMN_CANDIDATES = ('label', 'class', 'target', 'y', 'diagnosis', 'organ')
 
+class FreqMaskGenerator:
+    def __init__(self,
+                 input_size=224,
+                 mask_radius1=16,
+                 mask_radius2=999,
+                 sample_ratio=0.5):
+        self.input_size = input_size
+        self.mask_radius1 = mask_radius1
+        self.mask_radius2 = mask_radius2
+        self.sample_ratio = sample_ratio
+        self.mask = np.ones((self.input_size, self.input_size), dtype=int)
+        for y in range(self.input_size):
+            for x in range(self.input_size):
+                if ((x - self.input_size // 2) ** 2 + (y - self.input_size // 2) ** 2) >= self.mask_radius1 ** 2 \
+                        and ((x - self.input_size // 2) ** 2 + (y - self.input_size // 2) ** 2) < self.mask_radius2 ** 2:
+                    self.mask[y, x] = 0
+
+    def __call__(self):
+        rnd = torch.bernoulli(torch.tensor(self.sample_ratio, dtype=torch.float)).item()
+        if rnd == 0:  # high-pass
+            return 1 - self.mask
+        elif rnd == 1:  # low-pass
+            return self.mask
+        else:
+            raise ValueError
+
+class FrequencyUSFM(torch.nn.Module):
+    """Band-stop annular mask (USFM). sample_mask() -> float tensor [H, W], 1 = kept."""
+
+    def __init__(self, img_size, config):
+        super().__init__()
+        self.image_size = img_size
+        self.kept_area = config.DATA.USFM.KEPT_AREA
+        f_mask_group = self.get_f_mask_group(img_size, config)
+        self.mask_index = list(range(f_mask_group.shape[0]))
+        self.register_buffer("f_mask_group", f_mask_group)
+
+    @staticmethod
+    def get_f_mask_group(img_size, config):
+        n = img_size
+        c = n // 2
+        yy, xx = np.ogrid[:n, :n]
+        dist = np.sqrt((xx - c) ** 2 + (yy - c) ** 2)           # centered radii
+
+        f_mask_group = []
+        start, end, BW = c - config.DATA.USFM.CENTER_PROTECT, c + config.DATA.USFM.CENTER_PROTECT, config.DATA.USFM.BASEBW
+        while start >= 0:
+            R = end - c                                          # outer radius
+            rap = np.ones((n, n), dtype=np.float32)
+            rap[(dist >= R - BW) & (dist <= R)] = 0.0            # stop annulus [R-BW, R]
+            f_mask_group.append(torch.from_numpy(rap))
+            start, end = c - BW, c + BW
+            BW = BW + min(int(BW * config.DATA.USFM.INCREASE_FACTOR), config.DATA.USFM.MAXINCREASE)
+
+        rap_mask = [
+            (f_mask_group[i + 1] - f_mask_group[i] + 1).clamp(0, 1)   # clamp the +1 artifact
+            for i in range(len(f_mask_group) - 1)
+        ]
+        return torch.stack(rap_mask, dim=0)
+
+    def sample_mask(self):
+        random.shuffle(self.mask_index)
+        m = torch.ones_like(self.f_mask_group[0])
+        continuesampling=True
+        i=0
+        while continuesampling:
+            i+=1
+            m*=self.f_mask_group[self.mask_index[i]]
+            area=m.sum()/self.image_size**2
+            if area < self.kept_area:
+                continuesampling = False
+        return m # [H, W], collated to [B, H, W] and unsqueezed in models/mfm.py
+
+    def __call__(self):
+        return self.sample_mask()
 
 def make_radimgnet(
     transform,
@@ -51,7 +127,8 @@ def make_radimgnet(
     drop_duplicates=True,
     verify_exists=False,
     max_retries=None,
-    drop_last=True
+    drop_last=True,
+    config=None,
 ):
     dataset = RadImgNet(
         data_paths=data_paths,
@@ -60,7 +137,8 @@ def make_radimgnet(
         mode=color_mode,
         drop_duplicates=drop_duplicates,
         verify_exists=verify_exists,
-        max_retries=max_retries)
+        max_retries=max_retries,
+        config=config)
     logger.info('RadImgNet dataset created')
     dist_sampler = torch.utils.data.distributed.DistributedSampler(
         dataset=dataset,
@@ -153,7 +231,8 @@ class RadImgNet(Dataset):
         mode='RGB',
         drop_duplicates=True,
         verify_exists=False,
-        max_retries=None
+        max_retries=None,
+        config=None,
     ):
         """
         RadImgNet
@@ -231,7 +310,19 @@ class RadImgNet(Dataset):
         # Plain int (not shared memory): I-JEPA uses the 'spawn' start method
         # and non-persistent workers, so workers are re-created every epoch and
         # pick up the value set by `set_epoch`.
-        self._epoch = 0
+        self._epoch = 0 
+        self.mask_freq = config.data.mask_freq
+        
+        if self.mask_name == 'default':
+            self.freq_mask_generator = FreqMaskGenerator(
+                input_size=config.data.crop_size,
+                mask_radius1=config.DATA.MASK_RADIUS1,
+                mask_radius2=config.DATA.MASK_RADIUS2,
+                sample_ratio=config.DATA.SAMPLE_RATIO
+            )
+        elif self.mask_name == 'usfm':
+            self.freq_mask_generator = FrequencyUSFM(img_size=config.DATA.IMG_SIZE,
+                                                        config=config)
 
         # Integer targets. Unused by the I-JEPA objective, but the collator
         # requires a collatable type.
@@ -280,12 +371,16 @@ class RadImgNet(Dataset):
             retry += 1
             if retry > self.max_retries:
                 raise RuntimeError('no loadable image found in dataset')
-            # Uniform over the dataset, but a pure function of
-            # (slot, epoch, retry), hence reproducible across runs and ranks.
             rng = np.random.default_rng((anchor, self._epoch, 0x5117, retry))
             index = int(rng.integers(0, len(self)))
+        
+        if self.mask_name in ['default', 'usfm']: 
+            mask_freq = self.freq_mask_generator()
+        else:
+            mask_freq = None
 
         target = self.targets[index]
         if self.transform is not None:
             img = self.transform(img)
-        return img, target
+
+        return img, target, mask_freq

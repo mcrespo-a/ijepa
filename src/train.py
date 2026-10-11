@@ -291,7 +291,9 @@ def main(args, resume_preempt=False):
                 drop_duplicates=drop_duplicates,
                 verify_exists=verify_exists,
                 max_retries=max_retries,
-                drop_last=True)
+                drop_last=True,
+                config=args,
+                )
     else:
         raise ValueError(f'unknown dataset: {dataset_name}')
     ipe = len(unsupervised_loader)

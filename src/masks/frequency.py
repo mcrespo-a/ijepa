@@ -1,0 +1,183 @@
+#
+# Frequency-domain masking, ported from MFM (data/data_mfm.py, models/mfm.py).
+#
+# Mask convention (same as MFM): masks are [H, W] in the *centred* spectrum
+# (low frequencies in the middle, i.e. after fftshift), 1 = frequency kept,
+# 0 = frequency removed.
+#
+# Masks are sampled per image in the dataset (CPU, data-loader workers) and
+# applied on the GPU in the training loop with `apply_freq_mask`, which works
+# on the normalised tensors the I-JEPA transforms produce: the image is mapped
+# back to [0, 1], filtered, clamped and re-normalised, exactly as MFM filters
+# the raw image before normalising it.
+#
+
+from logging import getLogger
+
+import numpy as np
+import torch
+
+logger = getLogger()
+
+
+class FreqMaskGenerator:
+    """ MFM default: random low-pass or high-pass filter with a circular cutoff """
+
+    needs_image = False
+
+    def __init__(self, input_size=224, mask_radius1=16, mask_radius2=999, sample_ratio=0.5):
+        self.input_size = input_size
+        self.sample_ratio = sample_ratio
+        c = input_size // 2
+        yy, xx = np.ogrid[:input_size, :input_size]
+        d2 = (xx - c) ** 2 + (yy - c) ** 2
+        band = (d2 >= mask_radius1 ** 2) & (d2 < mask_radius2 ** 2)
+        self.mask = torch.from_numpy(~band)  # low-pass: keep the centre
+
+    def __call__(self, img=None):
+        if torch.rand(1).item() < self.sample_ratio:
+            return self.mask.clone()  # low-pass
+        return ~self.mask  # high-pass
+
+
+class FrequencyUSFM:
+    """ USFM band-stop: remove random annuli until the kept area < kept_area """
+
+    needs_image = False
+
+    def __init__(self, input_size=224, center_protect=3, base_bw=4,
+                 increase_factor=0.5, max_increase=16, kept_area=0.65):
+        self.input_size = input_size
+        self.kept_area = kept_area
+        n = input_size
+        c = n // 2
+        yy, xx = np.ogrid[:n, :n]
+        dist = np.sqrt((xx - c) ** 2 + (yy - c) ** 2)
+
+        f_mask_group = []
+        start, end, bw = c - center_protect, c + center_protect, base_bw
+        while start >= 0:
+            r = end - c
+            rap = np.ones((n, n), dtype=np.float32)
+            rap[(dist >= r - bw) & (dist <= r)] = 0.0  # stop annulus [r-bw, r]
+            f_mask_group.append(torch.from_numpy(rap))
+            start, end = c - bw, c + bw
+            bw = bw + min(int(bw * increase_factor), max_increase)
+
+        rap_mask = [(f_mask_group[i + 1] - f_mask_group[i] + 1).clamp(0, 1)
+                    for i in range(len(f_mask_group) - 1)]
+        self.f_mask_group = torch.stack(rap_mask, dim=0).bool()
+
+    def __call__(self, img=None):
+        m = torch.ones_like(self.f_mask_group[0])
+        for i in torch.randperm(len(self.f_mask_group)).tolist():
+            m &= self.f_mask_group[i]
+            if m.float().mean() < self.kept_area:
+                break
+        return m
+
+
+class FrequencyComRCom:
+    """ FOLK data-adaptive Com / RCom mask: keep the top (Com) or bottom (RCom)
+    `rate` fraction of the image's own spectral magnitudes """
+
+    needs_image = True
+
+    def __init__(self, input_size=224, rate_min=0.05, rate_max=0.95, com_prob=0.5):
+        self.input_size = input_size
+        self.rate_min = rate_min
+        self.rate_max = rate_max
+        self.com_prob = com_prob
+
+    @torch.no_grad()
+    def __call__(self, img):
+        """ img: [C, H, W] -> bool mask [H, W] (centred), 1 = kept """
+        h, w = img.shape[-2:]
+        n = h * w
+        spec = torch.fft.fft2(img.float().mean(0)).abs()
+        # make |F(u,v)| and |F(-u,-v)| identical so the mask stays Hermitian
+        spec = 0.5 * (spec + torch.roll(torch.flip(spec, (-2, -1)), (1, 1), (-2, -1)))
+        flat = spec.reshape(n)
+
+        rate = torch.empty(1).uniform_(self.rate_min, self.rate_max).item()
+        is_com = torch.rand(1).item() < self.com_prob
+        k = n - min(int(round(rate * n)), n)
+        thr = flat.kthvalue(max(k, 1)).values
+        com = flat > thr
+        mask = com if is_com else ~com
+        return torch.fft.fftshift(mask.reshape(h, w), dim=(-2, -1))
+
+
+def make_freq_mask_generator(cfg, crop_size):
+    """ Build a generator from the `freq_mask` config section, or None if disabled """
+    cfg = cfg or {}
+    if not cfg.get('enable', False):
+        return None
+    name = cfg.get('name', 'default')
+    if name == 'default':
+        gen = FreqMaskGenerator(
+            input_size=crop_size,
+            mask_radius1=cfg.get('mask_radius1', 16),
+            mask_radius2=cfg.get('mask_radius2', 999),
+            sample_ratio=cfg.get('sample_ratio', 0.5))
+    elif name == 'usfm':
+        usfm = cfg.get('usfm', None) or {}
+        gen = FrequencyUSFM(
+            input_size=crop_size,
+            center_protect=usfm.get('center_protect', 3),
+            base_bw=usfm.get('base_bw', 4),
+            increase_factor=usfm.get('increase_factor', 0.5),
+            max_increase=usfm.get('max_increase', 16),
+            kept_area=usfm.get('kept_area', 0.65))
+    elif name == 'folk':
+        gen = FrequencyComRCom(
+            input_size=crop_size,
+            rate_min=cfg.get('rate_min', 0.05),
+            rate_max=cfg.get('rate_max', 0.95),
+            com_prob=cfg.get('com_prob', 0.5))
+    else:
+        raise ValueError(f'unknown freq_mask.name: {name}')
+    logger.info(f'frequency masking enabled: {name} ({type(gen).__name__})')
+    return gen
+
+
+class FreqMaskTransform:
+    """ Wrap an image transform so it returns (img, freq_mask).
+
+    The mask is sampled after the transform, so it matches the crop size and
+    (for 'folk') is computed from the image actually seen by the model.
+    """
+
+    def __init__(self, transform, generator, prob=1.0):
+        self.transform = transform
+        self.generator = generator
+        self.prob = prob
+
+    def __call__(self, img):
+        img = self.transform(img)
+        if torch.rand(1).item() >= self.prob:
+            # -- all-ones mask: the image passes through unchanged
+            mask = torch.ones(img.shape[-2:], dtype=torch.bool)
+        elif self.generator.needs_image:
+            mask = self.generator(img)
+        else:
+            mask = self.generator()
+        return img, mask
+
+
+@torch.no_grad()
+def apply_freq_mask(x, mask, mean, std):
+    """ Filter a normalised batch in the frequency domain.
+
+    :param x: [B, C, H, W] normalised images
+    :param mask: [B, H, W] centred frequency mask, 1 = kept
+    :param mean, std: per-channel normalisation used by the transform
+    """
+    mean = torch.as_tensor(mean, device=x.device, dtype=torch.float32).view(1, -1, 1, 1)
+    std = torch.as_tensor(std, device=x.device, dtype=torch.float32).view(1, -1, 1, 1)
+    x_raw = x.float() * std + mean
+    x_freq = torch.fft.fftshift(torch.fft.fft2(x_raw), dim=(-2, -1))
+    x_freq = x_freq * mask.unsqueeze(1).to(x_freq.real.dtype)
+    x_raw = torch.fft.ifft2(torch.fft.ifftshift(x_freq, dim=(-2, -1))).real
+    x_raw = torch.clamp(x_raw, min=0., max=1.)
+    return ((x_raw - mean) / std).to(x.dtype)

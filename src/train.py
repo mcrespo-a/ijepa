@@ -21,6 +21,7 @@ from torch.nn.parallel import DistributedDataParallel
 
 from src.masks.multiblock import MaskCollator as MBMaskCollator
 from src.masks.utils import apply_masks
+from src.masks.frequency import apply_freq_mask
 from src.utils.distributed import (
     init_distributed,
     get_local_rank,
@@ -174,6 +175,10 @@ def main(args, resume_preempt=False):
     aspect_ratio = args['mask']['aspect_ratio']  # aspect ratio of target blocks
     # --
 
+    # -- FREQUENCY MASK (MFM-style filtering of the context-encoder input)
+    use_freq_mask = (args.get('freq_mask', None) or {}).get('enable', False)
+    # --
+
     # -- OPTIMIZATION
     ema = args['optimization']['ema']
     ipe_scale = args['optimization']['ipe_scale']  # scheduler scale factor (def: 1.0)
@@ -253,15 +258,19 @@ def main(args, resume_preempt=False):
         allow_overlap=allow_overlap,
         min_keep=min_keep)
 
+    normalization = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     transform = make_transforms(
         crop_size=crop_size,
         crop_scale=crop_scale,
         gaussian_blur=use_gaussian_blur,
         horizontal_flip=use_horizontal_flip,
         color_distortion=use_color_distortion,
-        color_jitter=color_jitter)
+        color_jitter=color_jitter,
+        normalization=normalization)
 
     # -- init data-loaders/samplers
+    if use_freq_mask and dataset_name != 'radimgnet':
+        raise NotImplementedError('freq_mask is only implemented for the radimgnet dataset')
     if dataset_name == 'imagenet1k':
         unsupervised_dataset, unsupervised_loader, unsupervised_sampler = make_imagenet1k(
                 transform=transform,
@@ -383,10 +392,17 @@ def main(args, resume_preempt=False):
             def load_imgs():
                 # -- unsupervised imgs
                 imgs = udata[0].to(device, non_blocking=True)
+                if use_freq_mask:
+                    # -- udata = [imgs, targets, freq_masks]; the context encoder
+                    # -- sees the filtered image, the target encoder the clean one
+                    fmasks = udata[2].to(device, non_blocking=True)
+                    imgs_ctx = apply_freq_mask(imgs, fmasks, *normalization)
+                else:
+                    imgs_ctx = imgs
                 masks_1 = [u.to(device, non_blocking=True) for u in masks_enc]
                 masks_2 = [u.to(device, non_blocking=True) for u in masks_pred]
-                return (imgs, masks_1, masks_2)
-            imgs, masks_enc, masks_pred = load_imgs()
+                return (imgs, imgs_ctx, masks_1, masks_2)
+            imgs, imgs_ctx, masks_enc, masks_pred = load_imgs()
             maskA_meter.update(len(masks_enc[0][0]))
             maskB_meter.update(len(masks_pred[0][0]))
 
@@ -408,7 +424,7 @@ def main(args, resume_preempt=False):
                         return h
 
                 def forward_context():
-                    z = encoder(imgs, masks_enc)
+                    z = encoder(imgs_ctx, masks_enc)
                     z = predictor(z, masks_enc, masks_pred)
                     return z # predicted target from the context embeddings
 

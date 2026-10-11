@@ -5,8 +5,8 @@
 # (low frequencies in the middle, i.e. after fftshift), 1 = frequency kept,
 # 0 = frequency removed.
 #
-# Masks are sampled per image in the dataset (CPU, data-loader workers) and
-# applied on the GPU in the training loop with `apply_freq_mask`, which works
+# Masks are sampled per image in the dataset (CPU, data-loader workers, see
+# src/datasets/radimgnet.py) and applied on the GPU in the training loop with `apply_freq_mask`, which works
 # on the normalised tensors the I-JEPA transforms produce: the image is mapped
 # back to [0, 1], filtered, clamped and re-normalised, exactly as MFM filters
 # the raw image before normalising it.
@@ -139,30 +139,6 @@ def make_freq_mask_generator(cfg, crop_size):
         raise ValueError(f'unknown freq_mask.name: {name}')
     logger.info(f'frequency masking enabled: {name} ({type(gen).__name__})')
     return gen
-
-
-class FreqMaskTransform:
-    """ Wrap an image transform so it returns (img, freq_mask).
-
-    The mask is sampled after the transform, so it matches the crop size and
-    (for 'folk') is computed from the image actually seen by the model.
-    """
-
-    def __init__(self, transform, generator, prob=1.0):
-        self.transform = transform
-        self.generator = generator
-        self.prob = prob
-
-    def __call__(self, img):
-        img = self.transform(img)
-        if torch.rand(1).item() >= self.prob:
-            # -- all-ones mask: the image passes through unchanged
-            mask = torch.ones(img.shape[-2:], dtype=torch.bool)
-        elif self.generator.needs_image:
-            mask = self.generator(img)
-        else:
-            mask = self.generator()
-        return img, mask
 
 
 @torch.no_grad()

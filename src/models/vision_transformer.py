@@ -17,7 +17,13 @@ from src.utils.tensors import (
     repeat_interleave_batch
 )
 from src.masks.utils import apply_masks
-
+def indices_to_mask(ids_keep: torch.Tensor, H: int = 224, W: int = 224,
+                    dtype=torch.float32) -> torch.Tensor:
+    """ids_keep: (B, K) flat row-major pixel indices. Returns (B, 1, H, W), 1 = kept."""
+    B = ids_keep.shape[0]
+    mask = torch.zeros(B, H * W, dtype=dtype, device=ids_keep.device)
+    mask.scatter_(1, ids_keep.long(), 1)
+    return mask.view(B, 1, H, W)
 
 def get_2d_sincos_pos_embed(embed_dim, grid_size, cls_token=False):
     """

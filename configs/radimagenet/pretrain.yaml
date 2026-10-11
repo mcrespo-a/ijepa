@@ -1,18 +1,9 @@
+# RadImageNet-US I-JEPA pre-training with MFM frequency masking.
+# Only values that differ from the defaults in src/config.py are listed.
 data:
   dataset: radimgnet
-  batch_size: 256
-  color_jitter_strength: 0.0
-  crop_scale:
-  - 0.3
-  - 1.0
-  crop_size: 224
-  num_workers: 5
-  pin_mem: true
   root_path: /project/data/shared_all/shared_datasets_new/
-  color_mode: RGB
-  drop_duplicates: true
   verify_exists: true
-  max_retries: null
   data_paths:
   - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_aorta_train.csv
   - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_bladder_train.csv
@@ -45,75 +36,12 @@ data:
   - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_thyroid_val.csv
   - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_thyroid_nodule_val.csv
   - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_uterus_val.csv
-  use_color_distortion: false
-  use_gaussian_blur: false
-  use_horizontal_flip: false
 logging:
   folder: /project/home/mcrespoa/ijepa/experiments/radimagenet-us/vits16.224-bs.512-ep.300/
-  write_tag: jepa
-mask:
-  allow_overlap: false
-  aspect_ratio:
-  - 0.75
-  - 1.5
-  enc_mask_scale:
-  - 0.85
-  - 1.0
-  min_keep: 10
-  num_enc_masks: 1
-  num_pred_masks: 4
-  patch_size: 16
-  pred_mask_scale:
-  - 0.15
-  - 0.2
 freq_mask:
-  # MFM-style frequency masking: the context encoder sees the filtered image,
-  # the target encoder the clean one
   enable: true
-  name: default        # default (low/high-pass) | usfm (band-stop annuli) | folk (Com/RCom)
-  prob: 1.0            # probability of filtering each image (else passed unchanged)
-  # -- default
-  mask_radius1: 16
-  mask_radius2: 999
-  sample_ratio: 0.5    # P(low-pass); high-pass otherwise
-  # -- usfm
-  usfm:
-    center_protect: 3
-    base_bw: 4
-    increase_factor: 0.5
-    max_increase: 16
-    kept_area: 0.65
-  # -- folk
-  rate_min: 0.05
-  rate_max: 0.95
-  com_prob: 0.5
-meta:
-  copy_data: false
-  load_checkpoint: false
-  model_name: vit_small
-  pred_depth: 12
-  pred_emb_dim: 384
-  read_checkpoint: null
-  use_bfloat16: true
-optimization:
-  ema:
-  - 0.996
-  - 1.0
-  epochs: 300
-  final_lr: 1.0e-06
-  final_weight_decay: 0.4
-  ipe_scale: 1.0
-  lr: 0.001
-  start_lr: 0.0002
-  warmup: 40
-  weight_decay: 0.04
 wandb:
-  root: '/project/home/mcrespoa/ijepa/experiments/radimagenet-us'
   enable: true
-  mode: offline
-  project: ijepa-pretrain
-  entity: null
+  root: /project/home/mcrespoa/ijepa/experiments/radimagenet-us
   group: radimagenet-us
   run_name: vits16.224-bs.512-ep.300
-  run_id: null
-  dir: null

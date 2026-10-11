@@ -41,6 +41,7 @@ from src.helper import (
     init_model,
     init_opt)
 from src.transforms import make_transforms
+from src.config import load_config
 
 # --
 log_timings = True
@@ -532,8 +533,7 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=40112,
                         help='rendezvous port for torch.distributed')
     cli_args = parser.parse_args()
-    with open(cli_args.fname, 'r') as y_file:
-        params = yaml.load(y_file, Loader=yaml.FullLoader)
+    params = load_config(cli_args.fname)
     # -- DDP wrappers need a (nccl) process group, even with a single process;
     # -- on CPU main() falls back to NoDDP instead
     if torch.cuda.is_available():

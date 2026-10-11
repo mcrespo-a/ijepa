@@ -10,9 +10,9 @@ import argparse
 import multiprocessing as mp
 
 import pprint
-import yaml
 
 from src.utils.distributed import init_distributed
+from src.config import load_config
 from src.train import main as app_main
 
 parser = argparse.ArgumentParser()
@@ -43,12 +43,10 @@ def process_main(rank, fname, world_size, devices, port=40112):
     logger.info(f'called-params {fname}')
 
     # -- load script params
-    params = None
-    with open(fname, 'r') as y_file:
-        params = yaml.load(y_file, Loader=yaml.FullLoader)
-        logger.info('loaded params...')
-        pp = pprint.PrettyPrinter(indent=4)
-        pp.pprint(params)
+    params = load_config(fname)
+    logger.info('loaded params...')
+    pp = pprint.PrettyPrinter(indent=4)
+    pp.pprint(params)
 
     world_size, rank = init_distributed(port=port, rank_and_world_size=(rank, world_size))
     logger.info(f'Running... (rank: {rank}/{world_size})')

@@ -16,9 +16,9 @@ import os
 import pprint
 import sys
 
-import yaml
 
 from src.utils.distributed import init_distributed, get_local_rank
+from src.config import load_config
 from src.train import main as app_main
 
 parser = argparse.ArgumentParser()
@@ -44,8 +44,7 @@ def main():
     logger.info(f'called-params {args.fname}')
 
     # -- load script params
-    with open(args.fname, 'r') as y_file:
-        params = yaml.load(y_file, Loader=yaml.FullLoader)
+    params = load_config(args.fname)
     if rank == 0:
         logger.info('loaded params...')
         pprint.PrettyPrinter(indent=4).pprint(params)

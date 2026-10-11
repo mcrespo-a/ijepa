@@ -10,11 +10,11 @@ import logging
 import os
 import pprint
 import sys
-import yaml
 
 import submitit
 
 from src.train import main as app_main
+from src.config import load_config
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger()
@@ -57,12 +57,10 @@ class Trainer:
         logger.info(f'called-params {fname}')
 
         # -- load script params
-        params = None
-        with open(fname, 'r') as y_file:
-            params = yaml.load(y_file, Loader=yaml.FullLoader)
-            logger.info('loaded params...')
-            pp = pprint.PrettyPrinter(indent=4)
-            pp.pprint(params)
+        params = load_config(fname)
+        logger.info('loaded params...')
+        pp = pprint.PrettyPrinter(indent=4)
+        pp.pprint(params)
 
         resume_preempt = False if load_model is None else load_model
         app_main(args=params, resume_preempt=resume_preempt)

@@ -46,7 +46,7 @@ from src.config import load_config
 # --
 log_timings = True
 log_freq = 10
-checkpoint_freq = 50
+checkpoint_freq = 10
 # --
 
 _GLOBAL_SEED = 0
@@ -371,8 +371,8 @@ def main(args, resume_preempt=False):
         }
         if rank == 0:
             torch.save(save_dict, latest_path)
-            if (epoch + 1) % checkpoint_freq == 0:
-                torch.save(save_dict, save_path.format(epoch=f'{epoch + 1}'))
+            # if (epoch) % checkpoint_freq == 0:
+            torch.save(save_dict, save_path.format(epoch=f'{epoch + 1}'))
 
     # -- TRAINING LOOP
     for epoch in range(start_epoch, num_epochs):
@@ -387,6 +387,8 @@ def main(args, resume_preempt=False):
         maskA_meter = AverageMeter()
         maskB_meter = AverageMeter()
         time_meter = AverageMeter()
+
+        save_checkpoint(-1)
 
         for itr, (udata, masks_enc, masks_pred) in enumerate(unsupervised_loader):
 
@@ -516,7 +518,7 @@ def main(args, resume_preempt=False):
             'epoch/index': epoch + 1,
             'epoch/loss': loss_meter.avg,
             'epoch/time_ms': time_meter.avg})
-        save_checkpoint(epoch+1)
+        save_checkpoint(epoch)
 
     if use_wandb:
         wandb.finish()

@@ -1,0 +1,33 @@
+# Debug variant of pretrain.yaml, used by .vscode/launch.json ("IJEPA: pretrain").
+# Inherits everything from pretrain.yaml and only overrides what differs.
+BASE: ['pretrain.yaml']
+data:
+  batch_size: 4
+  num_workers: 0         # keep data loading in-process so breakpoints bind
+  verify_exists: false
+  crop_scale:
+  - 0.3
+  - 1.0
+logging:
+  folder: /project/home/mcrespoa/ijepa/experiments/radimagenet-us/DEBUG/
+freq_mask:
+  enable: true
+  name: usfm
+wandb:
+  enable: false
+  run_name: DEBUG
+mask:
+  allow_overlap: false
+  aspect_ratio:
+  - 0.75
+  - 1.5
+  enc_mask_scale:
+  - 0.85
+  - 1.0
+  min_keep: 10
+  num_enc_masks: 1
+  num_pred_masks: 2
+  patch_size: 16
+  pred_mask_scale:
+  - 0.075 #0.15
+  - 0.125 #0.2

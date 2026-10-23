@@ -400,17 +400,8 @@ def main(args, resume_preempt=False):
             def load_imgs():
                 # -- unsupervised imgs
                 imgs = udata[0].to(device, non_blocking=True)
-                imgs_ctx = imgs.clone()
-                if freq_before_crop:
-                    # -- udata = [imgs, targets, imgs_ctx]; filtered in the dataset
-                    # -- before the crop, then cropped like the clean image
+                if use_freq_mask:
                     imgs_ctx = udata[2].to(device, non_blocking=True)
-                elif use_freq_mask:
-                    # -- udata = [imgs, targets, freq_masks]; the context encoder
-                    # -- sees the filtered image, the target encoder the clean one
-                    fmasks = udata[2].to(device, non_blocking=True)
-                    filtered = (fmasks != 1).flatten(1).any(1)  # (B,)
-                    imgs_ctx[filtered] = apply_freq_mask(imgs[filtered], fmasks[filtered], *normalization)
                 else:
                     imgs_ctx = imgs
                 masks_1 = [u.to(device, non_blocking=True) for u in masks_enc]

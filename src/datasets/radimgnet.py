@@ -297,14 +297,12 @@ class RadImgNet(Dataset):
             index = int(rng.integers(0, len(self)))
 
         target = self.targets[index]
-        if self.freq_mask_generator is not None and self.freq_before_crop:
+        if self.freq_mask_generator is not None:
             return self._corrupt_then_transform(img, target)
+        
         if self.transform is not None:
             img = self.transform(img)
-
-        if self.freq_mask_generator is None:
-            return img, target
-        return img, target, self._sample_freq_mask(img)
+        return img, target, None
 
     def _corrupt_then_transform(self, img, target):
         """ Filter the full-resolution image, then apply the same random

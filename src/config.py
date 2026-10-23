@@ -30,7 +30,7 @@ _C = {
         'pin_mem': True,
         'crop_size': 224,
         'crop_scale': [0.3, 1.0],
-        'use_resizing_transformation': False,
+        'use_resizing_transformation': True,
         'use_color_distortion': False,
         'color_jitter_strength': 0.0,
         'use_gaussian_blur': False,

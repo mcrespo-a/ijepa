@@ -179,6 +179,8 @@ def main(args, resume_preempt=False):
 
     # -- FREQUENCY MASK (MFM-style filtering of the context-encoder input)
     use_freq_mask = (args.get('freq_mask', None) or {}).get('enable', False)
+    # -- before_crop: the dataset filters the full image before cropping
+    freq_before_crop = use_freq_mask and args['freq_mask'].get('before_crop', False)
     # --
 
     # -- OPTIMIZATION
@@ -399,7 +401,11 @@ def main(args, resume_preempt=False):
                 # -- unsupervised imgs
                 imgs = udata[0].to(device, non_blocking=True)
                 imgs_ctx = imgs.clone()
-                if use_freq_mask:
+                if freq_before_crop:
+                    # -- udata = [imgs, targets, imgs_ctx]; filtered in the dataset
+                    # -- before the crop, then cropped like the clean image
+                    imgs_ctx = udata[2].to(device, non_blocking=True)
+                elif use_freq_mask:
                     # -- udata = [imgs, targets, freq_masks]; the context encoder
                     # -- sees the filtered image, the target encoder the clean one
                     fmasks = udata[2].to(device, non_blocking=True)

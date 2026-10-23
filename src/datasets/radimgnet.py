@@ -21,10 +21,11 @@ import numpy as np
 import pandas as pd
 
 import torch
+import torchvision.transforms.functional as TF
 from PIL import Image
 from torch.utils.data import Dataset
 
-from src.masks.frequency import make_freq_mask_generator
+from src.masks.frequency import filter_image, make_freq_mask_generator, resample_freq_mask
 
 logger = getLogger()
 
@@ -241,6 +242,9 @@ class RadImgNet(Dataset):
         crop_size = (config or {}).get('data', {}).get('crop_size', 224)
         self.freq_mask_generator = make_freq_mask_generator(freq_cfg, crop_size)
         self.freq_mask_prob = freq_cfg.get('prob', 1.0)
+        # `freq_mask.before_crop`: corrupt the full-resolution image before the
+        # transform (crop, flip, ...) instead of the crop in the training loop
+        self.freq_before_crop = freq_cfg.get('before_crop', False)
 
         # Integer targets. Unused by the I-JEPA objective, but the collator
         # requires a collatable type.
@@ -293,12 +297,39 @@ class RadImgNet(Dataset):
             index = int(rng.integers(0, len(self)))
 
         target = self.targets[index]
+        if self.freq_mask_generator is not None and self.freq_before_crop:
+            return self._corrupt_then_transform(img, target)
         if self.transform is not None:
             img = self.transform(img)
 
         if self.freq_mask_generator is None:
             return img, target
         return img, target, self._sample_freq_mask(img)
+
+    def _corrupt_then_transform(self, img, target):
+        """ Filter the full-resolution image, then apply the same random
+        transform (crop, flip, colour distortion, blur) to the clean and the
+        filtered image. Returns (img, target, img_ctx): the target encoder sees
+        `img`, the context encoder `img_ctx`, both from the same crop.
+        """
+        x = TF.to_tensor(img)  # [C, H, W] in [0, 1], full resolution
+        mask = self._sample_freq_mask(x)
+        corrupt = bool((mask != 1).any())
+        if corrupt:
+            # masks are built for the crop grid; folk masks already match the image
+            x = filter_image(x, resample_freq_mask(mask, x.shape[-2:]))
+            img_ctx = TF.to_pil_image((x * 255.).round().to(torch.uint8))
+
+        if self.transform is None:
+            return TF.to_tensor(img), target, x
+        # -- the transforms draw from the torch RNG only: replaying its state
+        # -- repeats every random choice for the filtered image
+        rng_state = torch.get_rng_state()
+        img = self.transform(img)
+        if not corrupt:
+            return img, target, img.clone()
+        torch.set_rng_state(rng_state)
+        return img, target, self.transform(img_ctx)
 
     def _sample_freq_mask(self, img):
         """ [H, W] bool mask in the centred spectrum, 1 = kept """

@@ -141,6 +141,32 @@ def make_freq_mask_generator(cfg, crop_size):
     return gen
 
 
+def resample_freq_mask(mask, out_hw):
+    """ Resample a centred [h, w] mask onto a centred grid of size out_hw.
+
+    Frequencies are matched in units of each grid's Nyquist frequency, so a
+    mask built for the crop size removes the same relative band of a larger
+    (full-resolution) image.
+    """
+    mask = torch.as_tensor(mask)
+
+    def index(n_out, n_src):
+        nu = (torch.arange(n_out) - n_out // 2) / (n_out / 2)
+        idx = torch.round(nu * (n_src / 2)).long() + n_src // 2
+        return idx.clamp(0, n_src - 1)
+
+    return mask[index(out_hw[0], mask.shape[0])][:, index(out_hw[1], mask.shape[1])]
+
+
+@torch.no_grad()
+def filter_image(x, mask):
+    """ Filter one raw [C, H, W] image in [0, 1] with a centred [H, W] mask, 1 = kept """
+    x_freq = torch.fft.fftshift(torch.fft.fft2(x.float()), dim=(-2, -1))
+    x_freq = x_freq * mask.to(x_freq.real.dtype)
+    x = torch.fft.ifft2(torch.fft.ifftshift(x_freq, dim=(-2, -1))).real
+    return torch.clamp(x, min=0., max=1.)
+
+
 @torch.no_grad()
 def apply_freq_mask(x, mask, mean, std):
     """ Filter a normalised batch in the frequency domain.

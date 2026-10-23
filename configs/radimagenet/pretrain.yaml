@@ -38,14 +38,16 @@ data:
   - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_thyroid_nodule_val.csv
   - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_uterus_val.csv
 logging:
-  folder: /project/home/mcrespoa/ijepa-freq/experiments/radimagenet-us/vits16.224-bs.512-ep.300-2.0
-# freq_mask:
-#   enable: true
+  folder: /project/home/mcrespoa/ijepa-freq/experiments/radimagenet-us/BANDPASS-vits16.224-bs.512-ep.300-normal05
 wandb:
   enable: true
   root: /project/home/mcrespoa/ijepa-freq/experiments/radimagenet-us
   group: radimagenet-us
-  run_name: vits16.224-bs.256-ep.300-2.0
+  run_name: BANDPASS-vits16.224-bs.512-ep.300-normal05
+freq_mask:
+  prob: 0.5
+  enable: true
+  name: usfm
 mask:
   allow_overlap: false
   aspect_ratio:
@@ -62,4 +64,5 @@ mask:
   - 0.15
   - 0.2
 optimization:
-  epochs: 2
+  epochs: 300
+  save_every: 10

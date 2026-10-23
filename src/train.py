@@ -148,6 +148,7 @@ def main(args, resume_preempt=False):
     use_gaussian_blur = args['data']['use_gaussian_blur']
     use_horizontal_flip = args['data']['use_horizontal_flip']
     use_color_distortion = args['data']['use_color_distortion']
+    resize = args['data']['use_resizing_transformation']
     color_jitter = args['data']['color_jitter_strength']
     # --
     batch_size = args['data']['batch_size']
@@ -190,6 +191,7 @@ def main(args, resume_preempt=False):
     start_lr = args['optimization']['start_lr']
     lr = args['optimization']['lr']
     final_lr = args['optimization']['final_lr']
+    save_every = args['optimization']['save_every']
 
     # -- LOGGING
     folder = os.path.join(args['wandb']['root'], args['wandb']['run_name'])
@@ -262,6 +264,7 @@ def main(args, resume_preempt=False):
     normalization = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     transform = make_transforms(
         crop_size=crop_size,
+        resize=resize,
         crop_scale=crop_scale,
         gaussian_blur=use_gaussian_blur,
         horizontal_flip=use_horizontal_flip,
@@ -395,11 +398,13 @@ def main(args, resume_preempt=False):
             def load_imgs():
                 # -- unsupervised imgs
                 imgs = udata[0].to(device, non_blocking=True)
+                imgs_ctx = imgs.clone()
                 if use_freq_mask:
                     # -- udata = [imgs, targets, freq_masks]; the context encoder
                     # -- sees the filtered image, the target encoder the clean one
                     fmasks = udata[2].to(device, non_blocking=True)
-                    imgs_ctx = apply_freq_mask(imgs, fmasks, *normalization)
+                    filtered = (fmasks != 1).flatten(1).any(1)  # (B,)
+                    imgs_ctx[filtered] = apply_freq_mask(imgs[filtered], fmasks[filtered], *normalization)
                 else:
                     imgs_ctx = imgs
                 masks_1 = [u.to(device, non_blocking=True) for u in masks_enc]
@@ -511,14 +516,14 @@ def main(args, resume_preempt=False):
             log_stats()
 
             assert not np.isnan(loss), 'loss is nan'
-
-        # -- Save Checkpoint after every epoch
-        logger.info('avg. loss %.3f' % loss_meter.avg)
-        wandb_log(use_wandb, {
-            'epoch/index': epoch + 1,
-            'epoch/loss': loss_meter.avg,
-            'epoch/time_ms': time_meter.avg})
-        save_checkpoint(epoch)
+        if (epoch % save_every == 0) or (epoch == num_epochs - 1):
+            # -- Save Checkpoint after every X epochs
+            logger.info('avg. loss %.3f' % loss_meter.avg)
+            wandb_log(use_wandb, {
+                'epoch/index': epoch,
+                'epoch/loss': loss_meter.avg,
+                'epoch/time_ms': time_meter.avg})
+            save_checkpoint(epoch)
 
     if use_wandb:
         wandb.finish()

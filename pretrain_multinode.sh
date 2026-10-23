@@ -5,8 +5,8 @@
 #SBATCH --ntasks-per-node=1          # = GPUs per node: one training process per GPU
 #SBATCH --cpus-per-task=8            # per GPU; keep data.num_workers <= this
 ##SBATCH --gres=gpu:1                # uncomment (= ntasks-per-node) if the partition does not allocate GPUs implicitly
-#SBATCH --output=/project/home/mcrespoa/ijepa/logs/vitsmall/%x_%j.out
-#SBATCH --error=/project/home/mcrespoa/ijepa/logs/vitsmall/%x_%j.err
+#SBATCH --output=/project/home/mcrespoa/ijepa-freq/logs/vitsmall/%x_%j.out
+#SBATCH --error=/project/home/mcrespoa/ijepa-freq/logs/vitsmall/%x_%j.err
 
 # Multi-node (and/or multi-GPU-per-node) I-JEPA pretraining.
 #
@@ -30,7 +30,7 @@ IJEPA_ENV="${IJEPA_ENV:-/project/home/mcrespoa/envs/vechoj}"
 source "${IJEPA_ENV}/bin/activate"
 
 # -- Paths
-PROJECT_DIR="/project/home/mcrespoa/ijepa"
+PROJECT_DIR="/project/home/mcrespoa/ijepa-freq"
 CONFIG_PATH="${CONFIG_PATH:-${PROJECT_DIR}/configs/radimagenet/pretrain.yaml}"
 ENTRY="main_multinode.py"
 
@@ -55,7 +55,6 @@ export NCCL_DEBUG="${NCCL_DEBUG:-WARN}"
 
 # -- wandb: offline by default (config wandb.mode), only rank 0 logs;
 #    sync afterwards with `wandb sync <logging.folder>/wandb/offline-run-*`
-
 echo "Job started on $(hostname) at $(date)"
 echo "SLURM_JOB_ID=${SLURM_JOB_ID}  NODES=${SLURM_JOB_NUM_NODES} (${SLURM_JOB_NODELIST})"
 echo "SLURM_NTASKS=${SLURM_NTASKS}  NTASKS_PER_NODE=${SLURM_NTASKS_PER_NODE}"

@@ -11,7 +11,10 @@ data:
 logging:
   folder: /project/home/mcrespoa/ijepa/experiments/radimagenet-us/DEBUG/
 freq_mask:
+  prob: 0.5
   enable: true
+  mask_radius1: 16
+  mask_radius2: 999
   name: usfm
 wandb:
   enable: false

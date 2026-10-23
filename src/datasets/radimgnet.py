@@ -233,9 +233,6 @@ class RadImgNet(Dataset):
         self.transform = transform
         self.mode = mode
         self.max_retries = max_retries if max_retries is not None else len(samples)
-        # Plain int (not shared memory): I-JEPA uses the 'spawn' start method
-        # and non-persistent workers, so workers are re-created every epoch and
-        # pick up the value set by `set_epoch`.
         self._epoch = 0
 
         # Frequency mask (MFM), sampled per image after the transform so it

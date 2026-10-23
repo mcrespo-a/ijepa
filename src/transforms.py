@@ -20,6 +20,7 @@ def make_transforms(
     crop_size=224,
     crop_scale=(0.3, 1.0),
     color_jitter=1.0,
+    resize=False,
     horizontal_flip=False,
     color_distortion=False,
     gaussian_blur=False,
@@ -39,7 +40,8 @@ def make_transforms(
         return color_distort
 
     transform_list = []
-    transform_list += [transforms.RandomResizedCrop(crop_size, scale=crop_scale)]
+    if resize:
+        transform_list += [transforms.RandomResizedCrop(crop_size, scale=crop_scale)]
     if horizontal_flip:
         transform_list += [transforms.RandomHorizontalFlip()]
     if color_distortion:

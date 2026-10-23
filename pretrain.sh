@@ -4,21 +4,17 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --output=/project/home/mcrespoa/ijepa/logs/vitsmall/%x_%j.out
-#SBATCH --error=/project/home/mcrespoa/ijepa/logs/vitsmall/%x_%j.err
+#SBATCH --output=/project/home/mcrespoa/ijepa-freq/logs/vitsmall/%x_%j.out
+#SBATCH --error=/project/home/mcrespoa/ijepa-freq/logs/vitsmall/%x_%j.err
 
 set -euo pipefail
 
-# -- Environment
-# IJEPA_ENV selects the venv; the default is the cu118 build, which has kernels
-# for the TITAN Xp (sm_61). Pascal has no bf16, so the config sets
-# meta.use_bfloat16: false. Needs pandas (RadImgNet manifests) and wandb.
-# IJEPA_ENV="${IJEPA_ENV:-/project/home/mcrespoa/envs/vechoj}"
-IJEPA_ENV="${IJEPA_ENV:-/project/home/mcrespoa/envs/vechoj-pascal}"
+IJEPA_ENV="${IJEPA_ENV:-/project/home/mcrespoa/envs/vechoj}"
+# IJEPA_ENV="${IJEPA_ENV:-/project/home/mcrespoa/envs/vechoj-pascal}"
 source "${IJEPA_ENV}/bin/activate"
 
 # -- Paths
-PROJECT_DIR="/project/home/mcrespoa/ijepa"
+PROJECT_DIR="/project/home/mcrespoa/ijepa-freq"
 CONFIG_PATH="${CONFIG_PATH:-${PROJECT_DIR}/configs/radimagenet/pretrain.yaml}"
 ENTRY="main.py"
 

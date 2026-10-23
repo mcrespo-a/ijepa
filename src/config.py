@@ -30,6 +30,7 @@ _C = {
         'pin_mem': True,
         'crop_size': 224,
         'crop_scale': [0.3, 1.0],
+        'use_resizing_transformation': False,
         'use_color_distortion': False,
         'color_jitter_strength': 0.0,
         'use_gaussian_blur': False,
@@ -63,7 +64,7 @@ _C = {
     'freq_mask': {
         'enable': False,
         'name': 'default',               # default (low/high-pass) | usfm (band-stop annuli) | folk (Com/RCom)
-        'prob': 1.0,                     # probability of filtering each image
+        'prob': 0.0,                     # probability of filtering each image
         # -- default
         'mask_radius1': 16,
         'mask_radius2': 999,
@@ -98,6 +99,7 @@ _C = {
     # -------------------------------------------------------------------------
     'optimization': {
         'epochs': 300,
+        'save_every': 50,
         'warmup': 40,
         'start_lr': 0.0002,
         'lr': 0.001,

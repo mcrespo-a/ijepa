@@ -1,0 +1,71 @@
+# RadImageNet-US I-JEPA pre-training with MFM frequency masking.
+# Only values that differ from the defaults in src/config.py are listed.
+data:
+  dataset: radimgnet
+  root_path: /project/data/shared_all/shared_datasets_new/
+  verify_exists: true
+  batch_size: 256
+  data_paths:
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_aorta_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_bladder_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_cbd_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_fibroid_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_gb_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_ivc_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_kidney_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_liver_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_ovary_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_pancreas_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_portal_vein_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_spleen_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_thyroid_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_thyroid_nodule_train.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_uterus_train.csv
+  # val
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_aorta_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_bladder_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_cbd_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_fibroid_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_gb_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_ivc_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_kidney_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_liver_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_ovary_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_pancreas_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_portal_vein_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_spleen_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_thyroid_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_thyroid_nodule_val.csv
+  - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_uterus_val.csv
+logging:
+  folder: /project/home/mcrespoa/ijepa-freq/experiments/radimagenet-us/LOWPASS-vits16.224-bs.512-ep.300-normal05
+wandb:
+  enable: true
+  root: /project/home/mcrespoa/ijepa-freq/experiments/radimagenet-us
+  group: radimagenet-us
+  run_name: LOWPASS-vits16.224-bs.512-ep.300-normal05
+freq_mask:
+  prob: 0.5
+  enable: true
+  name: default
+mask:
+  allow_overlap: false
+  aspect_ratio:
+  - 0.75
+  - 1.5
+  enc_mask_scale:
+  - 0.85
+  - 1.0
+  min_keep: 10
+  num_enc_masks: 1
+  num_pred_masks: 4
+  patch_size: 16
+  pred_mask_scale:
+  - 0.15
+  - 0.2
+optimization:
+  epochs: 300
+  save_every: 10
+meta:
+  load_checkpoint: True
+  read_checkpoint: /project/home/mcrespoa/ijepa-freq/experiments/radimagenet-us/LOWPASS-vits16.224-bs.512-ep.300-normal05/jepa-ep69.pth.tar

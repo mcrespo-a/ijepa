@@ -65,6 +65,7 @@ _C = {
         'enable': False,
         'name': 'default',               # default (low/high-pass) | usfm (band-stop annuli) | folk (Com/RCom)
         'prob': 0.0,                     # probability of filtering each image
+        'before_crop': False,            # filter the full image in the dataset, before the transform (radimgnet only)
         # -- default
         'mask_radius1': 16,
         'mask_radius2': 999,

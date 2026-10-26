@@ -54,7 +54,7 @@ logging:
   write_tag: jepa
 freq_mask:
   enable: true
-  mask: usfm
+  name: usfm
 mask:
   allow_overlap: false
   aspect_ratio:

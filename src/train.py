@@ -377,7 +377,7 @@ def main(args, resume_preempt=False):
         if rank == 0:
             torch.save(save_dict, latest_path)
             # if (epoch) % checkpoint_freq == 0:
-            torch.save(save_dict, save_path.format(epoch=f'{epoch + 1}'))
+            torch.save(save_dict, save_path.format(epoch=f'{epoch}'))
 
     # -- TRAINING LOOP
     for epoch in range(start_epoch, num_epochs):

@@ -22,6 +22,7 @@ def make_transforms(
     color_jitter=1.0,
     resize=False,
     horizontal_flip=False,
+    vertical_flip=False,
     color_distortion=False,
     gaussian_blur=False,
     normalization=((0.485, 0.456, 0.406),

@@ -20,7 +20,7 @@ import torch
 logger = getLogger()
 
 
-class FreqMaskGenerator:
+class MFMMaskGenerator:
     """ MFM default: random low-pass or high-pass filter with a circular cutoff """
 
     needs_image = False
@@ -38,6 +38,32 @@ class FreqMaskGenerator:
         if torch.rand(1).item() < self.sample_ratio:
             return self.mask.clone()  # low-pass
         return ~self.mask  # high-pass
+
+
+class LowPassMaskGenerator:
+    """ MFM low-pass / high-pass filter with a random circular cutoff: the
+    radius is drawn uniformly from [radius_min, radius_max] for every image """
+
+    needs_image = False
+
+    def __init__(self, input_size=224, radius_min=16, radius_max=None, sample_ratio=0.5):
+        self.input_size = input_size
+        self.sample_ratio = sample_ratio
+        c = input_size // 2
+        # default upper bound: Nyquist (largest circle inside the spectrum)
+        self.radius_min = radius_min
+        self.radius_max = c if radius_max is None else radius_max
+        assert 0 <= self.radius_min <= self.radius_max, \
+            f'invalid cutoff range [{self.radius_min}, {self.radius_max}]'
+        yy, xx = np.ogrid[:input_size, :input_size]
+        self.d2 = torch.from_numpy((xx - c) ** 2 + (yy - c) ** 2)
+
+    def __call__(self, img=None):
+        r = torch.randint(self.radius_min, self.radius_max + 1, (1,)).item()
+        mask = self.d2 < r ** 2  # low-pass: keep the centre
+        if torch.rand(1).item() < self.sample_ratio:
+            return mask  # low-pass
+        return ~mask  # high-pass
 
 
 class FrequencyUSFM:
@@ -115,10 +141,17 @@ def make_freq_mask_generator(cfg, crop_size):
         return None
     name = cfg.get('name', 'default')
     if name == 'default':
-        gen = FreqMaskGenerator(
+        gen = MFMMaskGenerator(
             input_size=crop_size,
             mask_radius1=cfg.get('mask_radius1', 16),
             mask_radius2=cfg.get('mask_radius2', 999),
+            sample_ratio=cfg.get('sample_ratio', 0.5))
+    elif name == 'LF':
+        lf = cfg.get('lf', None) or {}
+        gen = LowPassMaskGenerator(
+            input_size=crop_size,
+            radius_min=lf.get('radius_min', 16),
+            radius_max=lf.get('radius_max', None),
             sample_ratio=cfg.get('sample_ratio', 0.5))
     elif name == 'usfm':
         usfm = cfg.get('usfm', None) or {}

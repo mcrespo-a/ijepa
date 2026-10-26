@@ -29,7 +29,7 @@ _C = {
         'num_workers': 5,
         'pin_mem': True,
         'crop_size': 224,
-        'crop_scale': [0.3, 1.0],
+        'crop_scale': [0.6, 1.0],
         'use_resizing_transformation': True,
         'use_color_distortion': False,
         'color_jitter_strength': 0.0,
@@ -63,13 +63,18 @@ _C = {
     # -------------------------------------------------------------------------
     'freq_mask': {
         'enable': False,
-        'name': 'default',               # default (low/high-pass) | usfm (band-stop annuli) | folk (Com/RCom)
+        'name': 'default',               # default (low/high-pass) | LF (low/high-pass, random cutoff) | usfm (band-stop annuli) | folk (Com/RCom)
         'prob': 0.0,                     # probability of filtering each image
         'before_crop': False,            # filter the full image in the dataset, before the transform (radimgnet only)
         # -- default
         'mask_radius1': 16,
         'mask_radius2': 999,
-        'sample_ratio': 1.0,             # P(low-pass); high-pass otherwise
+        'sample_ratio': 1.0,             # P(low-pass); high-pass otherwise (default and LF)
+        # -- LF: cutoff radius ~ U{radius_min, ..., radius_max}, drawn per image
+        'lf': {
+            'radius_min': 16,
+            'radius_max': None,          # None = crop_size // 2 (Nyquist)
+        },
         # -- usfm
         'usfm': {
             'center_protect': 3,
@@ -101,9 +106,9 @@ _C = {
     'optimization': {
         'epochs': 300,
         'save_every': 50,
-        'warmup': 40,
-        'start_lr': 0.0002,
-        'lr': 0.001,
+        'warmup': 30,
+        'start_lr': 5.0e-05, #bsz 512: 0.0002,
+        'lr': 2.5e-04, #bsz 512: 0.001,
         'final_lr': 1.0e-06,
         'weight_decay': 0.04,
         'final_weight_decay': 0.4,

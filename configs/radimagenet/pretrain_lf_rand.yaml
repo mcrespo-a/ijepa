@@ -1,0 +1,16 @@
+# RadImageNet-US I-JEPA pre-training with MFM low-/high-pass frequency masking,
+# cutoff radius drawn uniformly from [radius_min, radius_max] for every image.
+# Inherits data / mask / optimization from pretrain.yaml.
+BASE: ['pretrain.yaml']
+logging:
+  folder: /project/home/mcrespoa/ijepa-freq/experiments/radimagenet-us/LFRAND-vits16.224-bs.512-ep.300-normal05
+wandb:
+  run_name: LFRAND-vits16.224-bs.512-ep.300-normal05
+freq_mask:
+  enable: true
+  name: LF
+  prob: 0.5              # P(filter the image at all)
+  sample_ratio: 1.0      # P(low-pass | filtered); high-pass otherwise
+  lf:
+    radius_min: 16
+    radius_max: 112      # crop_size // 2 (Nyquist); null = same

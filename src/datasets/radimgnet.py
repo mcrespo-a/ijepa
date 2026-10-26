@@ -302,7 +302,7 @@ class RadImgNet(Dataset):
         
         if self.transform is not None:
             img = self.transform(img)
-        return img, target, None
+        return img, target, img
 
     def _corrupt_then_transform(self, img, target):
         """ Filter the full-resolution image, then apply the same random

@@ -4,6 +4,9 @@
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1          # = GPUs per node: one training process per GPU
 #SBATCH --cpus-per-task=8            # per GPU; keep data.num_workers <= this
+#SBATCH --mem=120G                   # per node. The default (1800M per cpu = 14.4G) is too little at
+                                     # batch 256: the DataLoader workers' shared memory (/dev/shm) counts
+                                     # against it, and running out kills them with a bus error
 ##SBATCH --gres=gpu:1                # uncomment (= ntasks-per-node) if the partition does not allocate GPUs implicitly
 #SBATCH --output=/project/home/mcrespoa/ijepa-freq/logs/vitsmall/%x_%j.out
 #SBATCH --error=/project/home/mcrespoa/ijepa-freq/logs/vitsmall/%x_%j.err

@@ -21,7 +21,6 @@ from torch.nn.parallel import DistributedDataParallel
 
 from src.masks.multiblock import MaskCollator as MBMaskCollator
 from src.masks.utils import apply_masks
-from src.masks.frequency import apply_freq_mask
 from src.utils.distributed import (
     init_distributed,
     get_local_rank,
@@ -178,9 +177,9 @@ def main(args, resume_preempt=False):
     # --
 
     # -- FREQUENCY MASK (MFM-style filtering of the context-encoder input)
+    # -- the dataset filters the full image before cropping and returns the
+    # -- filtered crop as udata[2]
     use_freq_mask = (args.get('freq_mask', None) or {}).get('enable', False)
-    # -- before_crop: the dataset filters the full image before cropping
-    freq_before_crop = use_freq_mask and args['freq_mask'].get('before_crop', False)
     # --
 
     # -- OPTIMIZATION

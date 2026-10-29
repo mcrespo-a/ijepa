@@ -6,10 +6,9 @@
 # 0 = frequency removed.
 #
 # Masks are sampled per image in the dataset (CPU, data-loader workers, see
-# src/datasets/radimgnet.py) and applied on the GPU in the training loop with `apply_freq_mask`, which works
-# on the normalised tensors the I-JEPA transforms produce: the image is mapped
-# back to [0, 1], filtered, clamped and re-normalised, exactly as MFM filters
-# the raw image before normalising it.
+# src/datasets/radimgnet.py), resampled onto the full-resolution image with
+# `resample_freq_mask` and applied with `filter_image` before the crop, on the
+# raw image in [0, 1], as MFM filters the raw image before normalising it.
 #
 
 from logging import getLogger
@@ -198,21 +197,3 @@ def filter_image(x, mask):
     x_freq = x_freq * mask.to(x_freq.real.dtype)
     x = torch.fft.ifft2(torch.fft.ifftshift(x_freq, dim=(-2, -1))).real
     return torch.clamp(x, min=0., max=1.)
-
-
-@torch.no_grad()
-def apply_freq_mask(x, mask, mean, std):
-    """ Filter a normalised batch in the frequency domain.
-
-    :param x: [B, C, H, W] normalised images
-    :param mask: [B, H, W] centred frequency mask, 1 = kept
-    :param mean, std: per-channel normalisation used by the transform
-    """
-    mean = torch.as_tensor(mean, device=x.device, dtype=torch.float32).view(1, -1, 1, 1)
-    std = torch.as_tensor(std, device=x.device, dtype=torch.float32).view(1, -1, 1, 1)
-    x_raw = x.float() * std + mean
-    x_freq = torch.fft.fftshift(torch.fft.fft2(x_raw), dim=(-2, -1))
-    x_freq = x_freq * mask.unsqueeze(1).to(x_freq.real.dtype)
-    x_raw = torch.fft.ifft2(torch.fft.ifftshift(x_freq, dim=(-2, -1))).real
-    x_raw = torch.clamp(x_raw, min=0., max=1.)
-    return ((x_raw - mean) / std).to(x.dtype)

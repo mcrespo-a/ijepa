@@ -4,7 +4,7 @@ data:
   dataset: radimgnet
   root_path: /project/data/shared_all/shared_datasets_new/
   verify_exists: true
-  batch_size: 128
+  batch_size: 256
   data_paths:
   - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_aorta_train.csv
   - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_bladder_train.csv
@@ -38,12 +38,12 @@ data:
   - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_thyroid_nodule_val.csv
   - /project/data/shared_all/shared_datasets_new/radiology_ai/splits_us_byorgan/RadiologyAI_US_uterus_val.csv
 logging:
-  folder: /project/home/mcrespoa/ijepa-freq/experiments/radimagenet-us/LowPassRand-vits16.224-bs.128-ep.300-normal075-crop
+  folder: /project/home/mcrespoa/ijepa-freq/experiments/radimagenet-us/LP-R64r16-normal050-vits16.224-bs.512-ep.300
 wandb:
   enable: true
   root: /project/home/mcrespoa/ijepa-freq/experiments/radimagenet-us
   group: radimagenet-us
-  run_name: LowPassRand-vits16.224-bs.128-ep.300-normal075-crop
+  run_name: LP-R64r16-normal050-vits16.224-bs.512-ep.300
 freq_mask:
   enable: true
   name: LF
@@ -51,7 +51,7 @@ freq_mask:
   sample_ratio: 1.0      # P(low-pass | filtered); high-pass otherwise
   lf:
     radius_min: 16
-    radius_max: 32      # crop_size // 2 (Nyquist); null = same
+    radius_max: 64       # in crop-grid frequency units: Nyquist = crop_size // 2 = 112; null = Nyquist
 mask:
   allow_overlap: false
   aspect_ratio:
@@ -64,10 +64,11 @@ mask:
   num_enc_masks: 1
   num_pred_masks: 4
   patch_size: 16
-  pred_mask_scale:
-  - 0.075 #0.15
-  - 0.125 #
+  pred_mask_scale:      # I-JEPA's, as in the bs.512 baseline / BANDPASS / LOWPASS runs
+  - 0.15
+  - 0.2
 optimization:
   epochs: 300
   save_every: 20
-  ema: [0.999, 1.0]
+  warmup: 40            # as in the bs.512 baseline / BANDPASS / LOWPASS runs
+  ema: [0.996, 1.0]

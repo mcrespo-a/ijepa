@@ -59,8 +59,8 @@ mask:
   num_pred_masks: 4
   patch_size: 16
   pred_mask_scale:
-  - 0.075 #0.15
-  - 0.125 #
+  - 0.075
+  - 0.15
 optimization:
   epochs: 300
   save_every: 20

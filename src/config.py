@@ -65,7 +65,6 @@ _C = {
         'enable': False,
         'name': 'default',               # default (low/high-pass) | LF (low/high-pass, random cutoff) | usfm (band-stop annuli) | folk (Com/RCom)
         'prob': 0.0,                     # probability of filtering each image
-        'before_crop': False,            # filter the full image in the dataset, before the transform (radimgnet only)
         # -- default
         'mask_radius1': 16,
         'mask_radius2': 999,
@@ -104,11 +103,11 @@ _C = {
     # Optimisation
     # -------------------------------------------------------------------------
     'optimization': {
-        'epochs': 300,
+        'epochs': 600,
         'save_every': 50,
         'warmup': 30,
-        'start_lr': 5.0e-05, #bsz 512: 0.0002,
-        'lr': 2.5e-04, #bsz 512: 0.001,
+        'start_lr': 0.0002, #bsz 128 5.0e-05, 
+        'lr': 0.001, #bsz128 2.5e-04 
         'final_lr': 1.0e-06,
         'weight_decay': 0.04,
         'final_weight_decay': 0.4,

@@ -6,9 +6,10 @@
 # function are not. Transforms and the multi-block mask collator are the
 # standard I-JEPA ones (src/transforms.py, src/masks/multiblock.py).
 #
-# `__getitem__` returns `(img, target)`, the same contract as the ImageNet
-# loader, so `MaskCollator` yields `(udata, masks_enc, masks_pred)` with
-# `udata = [imgs, targets]`.
+# `__getitem__` returns `(img, target, img_ctx)`, so `MaskCollator` yields
+# `(udata, masks_enc, masks_pred)` with `udata = [imgs, targets, imgs_ctx]`:
+# the target encoder sees `img`, the context encoder `img_ctx`, the same crop
+# of the frequency-filtered image (or a copy of `img` when nothing is filtered).
 #
 
 import os
@@ -236,15 +237,14 @@ class RadImgNet(Dataset):
         self.max_retries = max_retries if max_retries is not None else len(samples)
         self._epoch = 0
 
-        # Frequency mask (MFM), sampled per image after the transform so it
-        # matches the crop size. None when `freq_mask.enable` is false.
+        # Frequency mask (MFM), sampled per image. The mask is built for the
+        # crop grid and resampled onto the full-resolution image, which is
+        # filtered before the transform (crop, flip, ...); see
+        # _corrupt_then_transform. None when `freq_mask.enable` is false.
         freq_cfg = (config or {}).get('freq_mask', None) or {}
         crop_size = (config or {}).get('data', {}).get('crop_size', 224)
         self.freq_mask_generator = make_freq_mask_generator(freq_cfg, crop_size)
         self.freq_mask_prob = freq_cfg.get('prob', 1.0)
-        # `freq_mask.before_crop`: corrupt the full-resolution image before the
-        # transform (crop, flip, ...) instead of the crop in the training loop
-        self.freq_before_crop = freq_cfg.get('before_crop', False)
 
         # Integer targets. Unused by the I-JEPA objective, but the collator
         # requires a collatable type.
@@ -310,29 +310,27 @@ class RadImgNet(Dataset):
         filtered image. Returns (img, target, img_ctx): the target encoder sees
         `img`, the context encoder `img_ctx`, both from the same crop.
         """
+        # -- decide first, so an image that passes unchanged costs one transform
+        if torch.rand(1).item() >= self.freq_mask_prob:
+            img = self.transform(img)
+            return img, target, img
         x = TF.to_tensor(img)  # [C, H, W] in [0, 1], full resolution
         mask = self._sample_freq_mask(x)
-        corrupt = bool((mask != 1).any())
-        if corrupt:
-            # masks are built for the crop grid; folk masks already match the image
-            x = filter_image(x, resample_freq_mask(mask, x.shape[-2:]))
-            img_ctx = TF.to_pil_image((x * 255.).round().to(torch.uint8))
-
-        if self.transform is None:
-            return TF.to_tensor(img), target, x
+        if not bool((mask != 1).any()):  # e.g. an LF cutoff at Nyquist keeps everything
+            img = self.transform(img)
+            return img, target, img
+        # masks are built for the crop grid; folk masks already match the image
+        x = filter_image(x, resample_freq_mask(mask, x.shape[-2:]))
+        img_ctx = TF.to_pil_image((x * 255.).round().to(torch.uint8))
         # -- the transforms draw from the torch RNG only: replaying its state
-        # -- repeats every random choice for the filtered image
+        # -- repeats every random choice (crop, flip, ...) for the filtered image
         rng_state = torch.get_rng_state()
         img = self.transform(img)
-        if not corrupt:
-            return img, target, img.clone()
         torch.set_rng_state(rng_state)
         return img, target, self.transform(img_ctx)
 
     def _sample_freq_mask(self, img):
         """ [H, W] bool mask in the centred spectrum, 1 = kept """
-        if torch.rand(1).item() >= self.freq_mask_prob:
-            return torch.ones(img.shape[-2:], dtype=torch.bool)  # image passes unchanged
         if self.freq_mask_generator.needs_image:
             return self.freq_mask_generator(img)
         return self.freq_mask_generator()
